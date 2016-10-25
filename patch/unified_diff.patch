@@ -1,0 +1,468 @@
+diff --git a/usr/lib/qt5/qml/com/jolla/settings/multisim/DataSimSelector.qml b/usr/lib/qt5/qml/com/jolla/settings/multisim/DataSimSelector.qml
+index 656effc..a31246d 100644
+--- a/usr/lib/qt5/qml/com/jolla/settings/multisim/DataSimSelector.qml
++++ b/usr/lib/qt5/qml/com/jolla/settings/multisim/DataSimSelector.qml
+@@ -6,6 +6,7 @@
+ import QtQuick 2.2
+ import Sailfish.Silica 1.0
+ import Sailfish.Telephony 1.0
++import org.nemomobile.configuration 1.0
+ 
+ SimSelectorBase {
+     id: root
+@@ -49,9 +50,15 @@ SimSelectorBase {
+                 delegate: MenuItem {
+                     down: mouseBlocker.pressed
+                     highlighted: down || root.activeSim === index
+-                    text: errorState.errorState ? (model.shortSimDescription + " | " + errorState.shortErrorString) : model.simName
++                    text: errorState.errorState ? (model.shortSimDescription + " | " + errorState.shortErrorString) : fakeOperator.value ? ("SIM%1 | %2".arg(index + 1).arg(fakeOperator.value)) : model.simName
+                     enabled: errorState.errorState != "noSimInserted" && errorState.errorState != "modemDisabled"
+ 
++                    ConfigurationValue {
++                        id: fakeOperator
++                        key: "/desktop/lipstick-jolla-home/ril_%1_fakeName".arg(index)
++                        defaultValue: ""
++                    }
++
+                     // Do not let MenuItem to trigger clicked signal as the ContextMenu updates
+                     // currentIndex automatically. Update ComboBox.currentIndex only when active
+                     // SIM has changed.
+diff --git a/usr/share/jolla-settings/pages/about/about.qml b/usr/share/jolla-settings/pages/about/about.qml
+index cb3aa41..5cbdf4e 100644
+--- a/usr/share/jolla-settings/pages/about/about.qml
++++ b/usr/share/jolla-settings/pages/about/about.qml
+@@ -4,6 +4,7 @@ import com.jolla.settings.system 1.0
+ import org.nemomobile.systemsettings 1.0
+ import org.nemomobile.ofono 1.0
+ import org.nemomobile.dbus 2.0
++import org.nemomobile.configuration 1.0
+ 
+ Page {
+     id: aboutPage
+@@ -88,7 +89,7 @@ Page {
+                     //% "IMEI"
+                     label: qsTrId("settings_about-la-imei")
+                     // TODO: locale specific separator
+-                    value: modemManager.imeiCodes.join(", ")
++                    value: fakeInfo.fakeImei ? fakeInfo.fakeImei : modemManager.imeiCodes.join(", ")
+                     visible: value != ""
+ 
+                     OfonoModemManager {
+@@ -168,13 +169,13 @@ Page {
+                 DetailItem {
+                     //% "WLAN MAC address"
+                     label: qsTrId("settings_about-la-wlan_mac_address")
+-                    value: aboutSettings.wlanMacAddress
++                    value: fakeInfo.fakeWlan ? fakeInfo.fakeWlan : aboutSettings.wlanMacAddress
+                 }
+ 
+                 DetailItem {
+                     //% "Bluetooth address"
+                     label: qsTrId("settings_about-la-bluetooth_address")
+-                    value: bluetoothInfo.adapterAddress
++                    value: fakeInfo.fakeBluetooth ? fakeInfo.fakeBluetooth : bluetoothInfo.adapterAddress
+ 
+                     // aboutSettings.bluetoothAddress may be 00:00:00:00:00 if the adapter could not
+                     // be initialized at start-up, use BluetoothInfo instead (guarantees a valid address)
+@@ -217,4 +218,12 @@ Page {
+ 
+         VerticalScrollDecorator {}
+     }
++
++    ConfigurationGroup {
++        id: fakeInfo
++        path: "/desktop/lipstick-jolla-home"
++        property string fakeImei: ""
++        property string fakeWlan: ""
++        property string fakeBluetooth: ""
++    }
+ }
+diff --git a/usr/share/jolla-settings/pages/datacounters/mainpage.qml b/usr/share/jolla-settings/pages/datacounters/mainpage.qml
+index ef64ea0..2eda99d 100644
+--- a/usr/share/jolla-settings/pages/datacounters/mainpage.qml
++++ b/usr/share/jolla-settings/pages/datacounters/mainpage.qml
+@@ -88,11 +88,17 @@ Page {
+                         key: "/apps/jolla-settings/last_cellular_subscriberidentities" + modelData
+                     }
+ 
++                    ConfigurationValue {
++                        id: fakeOperator
++                        key: "/desktop/lipstick-jolla-home%1_fakeName".arg(modelData)
++                        defaultValue: ""
++                    }
++
+                     SectionHeader {
+                         text: mobileDataRepeater.count == 1
+                                 //% "Mobile data"
+                               ? qsTrId("settings_network-he-mobile_data")
+-                              : sailfishSimManager.simNames[index]
++                              : fakeOperator.value ? ("SIM%1 | %2".arg(index + 1).arg(fakeOperator.value)) : sailfishSimManager.simNames[index]
+                     }
+ 
+                     SimSectionPlaceholder {
+diff --git a/usr/share/jolla-settings/pages/jolla-contacts/contactssettings.qml b/usr/share/jolla-settings/pages/jolla-contacts/contactssettings.qml
+index 86c7252..a50742e 100644
+--- a/usr/share/jolla-settings/pages/jolla-contacts/contactssettings.qml
++++ b/usr/share/jolla-settings/pages/jolla-contacts/contactssettings.qml
+@@ -135,7 +135,7 @@ Page {
+                             return simName 
+                                       //: Can be clicked to import contacts from a SIM card. %1 = SIM card name
+                                       //% "From %1"
+-                                    ? qsTrId("contacts_settings-la-import_from_sim").arg(simName)
++                                    ? qsTrId("contacts_settings-la-import_from_sim").arg(fakeOperator.value ? ("SIM%1 | %2".arg(index + 1).arg(fakeOperator.value)) : simName)
+                                       //: Can be clicked to import contacts from a SIM card
+                                       //% "From SIM"
+                                     : qsTrId("contacts_settings-la-import_from_sim_unnamed")
+@@ -144,6 +144,12 @@ Page {
+                         onClicked: {
+                             contactsDbusIface.call('importContactsFromSim', [model.path])
+                         }
++
++                        ConfigurationValue {
++                            id: fakeOperator
++                            key: "/desktop/lipstick-jolla-home/ril_%1_fakeName".arg(index)
++                            defaultValue: ""
++                        }
+                     }
+                 }
+                 ImportButton {
+diff --git a/usr/share/jolla-settings/pages/jolla-messages/messages.qml b/usr/share/jolla-settings/pages/jolla-messages/messages.qml
+index 8cde4eb..c6a48b3 100644
+--- a/usr/share/jolla-settings/pages/jolla-messages/messages.qml
++++ b/usr/share/jolla-settings/pages/jolla-messages/messages.qml
+@@ -5,6 +5,7 @@ import MeeGo.QOfono 0.2
+ import com.jolla.messages.settings.translations 1.0
+ import org.nemomobile.ofono 1.0
+ import com.jolla.settings.system 1.0
++import org.nemomobile.configuration 1.0
+ 
+ Page {
+     id: mainPage
+@@ -64,7 +65,7 @@ Page {
+ 
+                     delegate: ExpandingSection {
+                         buttonHeight: (title.length && modemManager.availableModems.length > 1) ? Theme.itemSizeMedium : 0 // hide section header if only one modem
+-                        title: sailfishSimManager.simNames[sailfishSimManager.indexOfModem(modelData)]
++                        title: fakeOperator.value ? ("SIM%1 | %2".arg(index + 1).arg(fakeOperator.value)) : sailfishSimManager.simNames[sailfishSimManager.indexOfModem(modelData)]
+                         content.sourceComponent: Column {
+                             width: parent.width
+ 
+@@ -88,6 +89,12 @@ Page {
+                                 modemPath: modelData
+                             }
+                         }
++
++                        ConfigurationValue {
++                            id: fakeOperator
++                            key: "/desktop/lipstick-jolla-home/ril_%1_fakeName".arg(index)
++                            defaultValue: ""
++                        }
+                     }
+                 }
+             }
+diff --git a/usr/share/jolla-settings/pages/jolla-voicecall/voicecall.qml b/usr/share/jolla-settings/pages/jolla-voicecall/voicecall.qml
+index 730aed8..696a190 100644
+--- a/usr/share/jolla-settings/pages/jolla-voicecall/voicecall.qml
++++ b/usr/share/jolla-settings/pages/jolla-voicecall/voicecall.qml
+@@ -87,7 +87,13 @@ Page {
+                         function applyVoiceMailSettings() { if (content.item) content.item.applyVoiceMailSettings() }
+ 
+                         buttonHeight: (title.length && simCardSettingsRepeater.count > 1) ? Theme.itemSizeMedium : 0 // hide section header if only one simcard.
+-                        title: sailfishSimManager.ready ? sailfishSimManager.simNames[sailfishSimManager.indexOfModem(modelData)] : ""
++                        title: sailfishSimManager.ready ? fakeOperator.value ? ("SIM%1 | %2".arg(index + 1).arg(fakeOperator.value)) : sailfishSimManager.simNames[sailfishSimManager.indexOfModem(modelData)] : ""
++
++                        ConfigurationValue {
++                            id: fakeOperator
++                            key: "/desktop/lipstick-jolla-home/ril_%1_fakeName".arg(index)
++                            defaultValue: ""
++                        }
+ 
+                         content.sourceComponent: SimCardCallSettings {
+                             width: section.width
+diff --git a/usr/share/jolla-settings/pages/mobilenetworking/MobileDataSwitch.qml b/usr/share/jolla-settings/pages/mobilenetworking/MobileDataSwitch.qml
+index 4d2bcdb..ac62956 100644
+--- a/usr/share/jolla-settings/pages/mobilenetworking/MobileDataSwitch.qml
++++ b/usr/share/jolla-settings/pages/mobilenetworking/MobileDataSwitch.qml
+@@ -5,6 +5,7 @@ import MeeGo.QOfono 0.2
+ import MeeGo.Connman 0.2
+ import org.nemomobile.ofono 1.0
+ import com.jolla.settings.network.translations 1.0
++import org.nemomobile.configuration 1.0
+ import "functions.js" as JS
+ 
+ IconTextSwitch {
+@@ -13,7 +14,8 @@ IconTextSwitch {
+     property string modemPath
+ 
+     property bool _processing
+-    property string _connectionName
++    property string _connectionName: fakeOperator.value ? fakeOperator.value : _simName
++    property string _simName
+ 
+     /*
+      * connman service list updates after a delay after toggling Roaming Data allowed,
+@@ -115,8 +117,8 @@ IconTextSwitch {
+ 
+     OfonoContextConnection {
+         id: dataContext
+-        onNameChanged: root._connectionName = name
+-        onContextPathChanged: root._connectionName = name
++        onNameChanged: root._simName = name
++        onContextPathChanged: root._simName = name
+         contextPath: connectionManager.contexts.length > 0 ? connectionManager.contexts[0] : ""
+         onReportError: errors.sendError(errorString)
+     }
+@@ -155,4 +157,10 @@ IconTextSwitch {
+         interval: 12000
+         repeat: false
+     }
++
++    ConfigurationValue {
++        id: fakeOperator
++        key: "/desktop/lipstick-jolla-home/fake_connectionName"
++        defaultValue: ""
++    }
+ }
+diff --git a/usr/share/jolla-settings/pages/mobilenetworking/SimMobileNetworkSettings.qml b/usr/share/jolla-settings/pages/mobilenetworking/SimMobileNetworkSettings.qml
+index a6a6fa8..7e4b9e6 100644
+--- a/usr/share/jolla-settings/pages/mobilenetworking/SimMobileNetworkSettings.qml
++++ b/usr/share/jolla-settings/pages/mobilenetworking/SimMobileNetworkSettings.qml
+@@ -4,6 +4,7 @@ import MeeGo.Connman 0.2
+ import Sailfish.Silica 1.0
+ import MeeGo.Connman 0.2
+ import com.jolla.settings.network.translations 1.0
++import org.nemomobile.configuration 1.0
+ 
+ Column {
+     id: root
+@@ -278,7 +279,7 @@ Column {
+         label: qsTrId("settings_network-bt_manual_network_selection")
+         value: {
+             if (networkRegistration.status === "registered" || networkRegistration.status === "roaming") {
+-                return networkRegistration.name
++                return fakeOperator.value ? fakeOperator.value : networkRegistration.name
+             } else if (networkRegistration.status === "searching") {
+                 //: Search for mobile network
+                 //% "Searching..."
+@@ -300,4 +301,10 @@ Column {
+                                   { operators: operatorsModel, registration: networkRegistration })
+         }
+     }
++
++    ConfigurationValue {
++        id: fakeOperator
++        key: "/desktop/lipstick-jolla-home%1_fakeName".arg(modemPath)
++        defaultValue: ""
++    }
+ }
+diff --git a/usr/share/jolla-settings/pages/mobilenetworking/mainpage.qml b/usr/share/jolla-settings/pages/mobilenetworking/mainpage.qml
+index fded888..4197b0d 100644
+--- a/usr/share/jolla-settings/pages/mobilenetworking/mainpage.qml
++++ b/usr/share/jolla-settings/pages/mobilenetworking/mainpage.qml
+@@ -7,6 +7,7 @@ import com.jolla.settings.system 1.0
+ import org.nemomobile.ofono 1.0
+ import org.nemomobile.dbus 1.0
+ import com.jolla.settings.network.translations 1.0
++import org.nemomobile.configuration 1.0
+ 
+ Page {
+     id: root
+@@ -108,8 +109,14 @@ Page {
+                     width: parent.width
+ 
+                     SectionHeader {
+-                        text: Telephony.multiSimSupported ? sailfishSimManager.simNames[sailfishSimManager.indexOfModem(modelData)] || "" : ""
++                        text: fakeOperator.value ? ("SIM%1 | %2".arg(modelData == "/ril_0" ? 1 : 2).arg(fakeOperator.value)) : Telephony.multiSimSupported ? sailfishSimManager.simNames[sailfishSimManager.indexOfModem(modelData)] || "" : ""
+                         visible: Telephony.multiSimSupported
++
++                        ConfigurationValue {
++                            id: fakeOperator
++                            key: "/desktop/lipstick-jolla-home%1_fakeName".arg(modelData)
++                            defaultValue: ""
++                        }
+                     }
+ 
+                     SimSectionPlaceholder {
+diff --git a/usr/share/jolla-settings/pages/multisim/VoiceSimSelector.qml b/usr/share/jolla-settings/pages/multisim/VoiceSimSelector.qml
+index 62fd444..f50238c 100644
+--- a/usr/share/jolla-settings/pages/multisim/VoiceSimSelector.qml
++++ b/usr/share/jolla-settings/pages/multisim/VoiceSimSelector.qml
+@@ -6,6 +6,7 @@
+ import QtQuick 2.2
+ import Sailfish.Silica 1.0
+ import Sailfish.Telephony 1.0
++import org.nemomobile.configuration 1.0
+ 
+ SimSelectorBase {
+     id: root
+@@ -115,7 +116,13 @@ SimSelectorBase {
+                 delegate: MenuItem {
+                     down: mouseBlocker.pressed && mouseBlocker.containsMouse
+                     highlighted: down || selectedItem
+-                    text: model.title
++                    text: fakeOperator.value ? ("SIM%1 | %2".arg(index + 1).arg(fakeOperator.value)) : model.title
++
++                    ConfigurationValue {
++                        id: fakeOperator
++                        key: "/desktop/lipstick-jolla-home/ril_%1_fakeName".arg(index)
++                        defaultValue: ""
++                    }
+ 
+                     // Do not let MenuItem to trigger clicked signal as the ContextMenu updates
+                     // currentIndex automatically. Update ComboBox.currentIndex only when active
+diff --git a/usr/share/jolla-settings/pages/multisim/multisim.qml b/usr/share/jolla-settings/pages/multisim/multisim.qml
+index 64a3786..12b9800 100644
+--- a/usr/share/jolla-settings/pages/multisim/multisim.qml
++++ b/usr/share/jolla-settings/pages/multisim/multisim.qml
+@@ -3,6 +3,7 @@ import Sailfish.Silica 1.0
+ import Sailfish.Telephony 1.0 as Telephony
+ import com.jolla.settings.network.translations 1.0
+ import com.jolla.settings.system 1.0
++import org.nemomobile.configuration 1.0
+ 
+ Page {
+     id: root
+@@ -43,7 +44,7 @@ Page {
+                     automaticCheck: false
+                     text: longSimDescription
+                     description: enabled && errorState.errorState ? errorState.errorString
+-                                                                  : operatorDescription
++                                                                  : fakeOperator.value ? fakeOperator.value : operatorDescription
+ 
+                     checked: modemEnabled
+                     onClicked: voiceSimSelector.modemManager.enableModem(modem, !modemEnabled)
+@@ -53,6 +54,12 @@ Page {
+                         multiSimManager: voiceSimSelector.modemManager
+                         modemPath: modem
+                     }
++
++                    ConfigurationValue {
++                        id: fakeOperator
++                        key: "/desktop/lipstick-jolla-home%1_fakeName".arg(modem)
++                        defaultValue: ""
++                    }
+                 }
+             }
+ 
+diff --git a/usr/share/jolla-settings/pages/pin/pin.qml b/usr/share/jolla-settings/pages/pin/pin.qml
+index 32b81b9..263d8dd 100644
+--- a/usr/share/jolla-settings/pages/pin/pin.qml
++++ b/usr/share/jolla-settings/pages/pin/pin.qml
+@@ -5,6 +5,7 @@ import com.jolla.settings.system 1.0
+ import org.nemomobile.systemsettings 1.0
+ import org.nemomobile.ofono 1.0
+ import MeeGo.QOfono 0.2
++import org.nemomobile.configuration 1.0
+ 
+ Page {
+     id: root
+@@ -53,7 +54,13 @@ Page {
+                     SectionHeader {
+                         id: simNameHeader
+                         visible: Telephony.multiSimSupported
+-                        text: modemPin.multiModemIndex >= 0 ? sailfishSimManager.simNames[modemPin.multiModemIndex] : ""
++                        text: fakeOperator.value ? ("SIM%1 | %2".arg(index).arg(fakeOperator.value)) : (modemPin.multiModemIndex >= 0 ? sailfishSimManager.simNames[modemPin.multiModemIndex] : "")
++
++                        ConfigurationValue {
++                            id: fakeOperator
++                            key: "/desktop/lipstick-jolla-home%1_fakeName".arg(modelData)
++                            defaultValue: ""
++                        }
+                     }
+ 
+                     SimSectionPlaceholder {
+diff --git a/usr/share/lipstick-jolla-home-qt5/statusarea/CellularNetworkNameStatusIndicator.qml b/usr/share/lipstick-jolla-home-qt5/statusarea/CellularNetworkNameStatusIndicator.qml
+index a8bf78d..29b7551 100644
+--- a/usr/share/lipstick-jolla-home-qt5/statusarea/CellularNetworkNameStatusIndicator.qml
++++ b/usr/share/lipstick-jolla-home-qt5/statusarea/CellularNetworkNameStatusIndicator.qml
+@@ -9,6 +9,7 @@ import QtQuick 2.0
+ import org.freedesktop.contextkit 1.0
+ import Sailfish.Silica 1.0
+ import com.jolla.lipstick 0.1
++import org.nemomobile.configuration 1.0
+ 
+ Row {
+     id: cellularNetworkNameStatusIndicator
+@@ -87,8 +88,9 @@ Row {
+     }
+ 
+     function setNetworkName() {
+-        if (fakeOperator !== "") {
+-            cellularNetworkNameStatusIndicatorHome.text = fakeOperator
++        if (fakeOperatorName.value !== "") {
++            cellularNetworkNameStatusIndicatorHome.text = fakeOperatorName.value
++            cellularNetworkNameStatusIndicatorVisitor.text = ""
+             return
+         }
+ 
+@@ -131,4 +133,10 @@ Row {
+             registrationStatus.unsubscribe()
+         }
+     }
++
++    ConfigurationValue {
++        id: fakeOperatorName
++        key: "/desktop/lipstick-jolla-home/fake_operatorName"
++        defaultValue: ""
++    }
+ }
+diff --git a/usr/share/voicecall-ui-jolla/pages/calling/InCallView.qml b/usr/share/voicecall-ui-jolla/pages/calling/InCallView.qml
+index e8c8f4c..cc6bb32 100644
+--- a/usr/share/voicecall-ui-jolla/pages/calling/InCallView.qml
++++ b/usr/share/voicecall-ui-jolla/pages/calling/InCallView.qml
+@@ -4,6 +4,7 @@ import Sailfish.Bluetooth 1.0
+ import Sailfish.Telephony 1.0
+ import org.nemomobile.configuration 1.0
+ import org.nemomobile.voicecall 1.0 as VoiceCall
++import org.nemomobile.configuration 1.0
+ import "../../common/CallLog.js" as CallLog
+ 
+ SilicaFlickable {
+@@ -334,7 +335,7 @@ SilicaFlickable {
+     Label {
+         id: simNameLabel
+ 
+-        property string callSimName: telephony.simNameForCall(telephony.primaryCall)
++        property string callSimName: fakeOperator.value ? ("SIM1 | %1".arg(fakeOperator.value)) : telephony.simNameForCall(telephony.primaryCall)
+ 
+         anchors {
+             top: stateLabel.bottom
+@@ -350,6 +351,12 @@ SilicaFlickable {
+         font.pixelSize: Theme.fontSizeSmall
+         visible: callSimName.length > 0.0
+         text: (main.state != "disconnected" && main.state != "null") ? callSimName : ""
++
++        ConfigurationValue {
++            id: fakeOperator
++            key: "/desktop/lipstick-jolla-home/ril_0_fakeName"
++            defaultValue: ""
++        }
+     }
+     Row {
+         id: buttonRow
+diff --git a/usr/share/voicecall-ui-jolla/pages/calling/IncomingCallViewBase.qml b/usr/share/voicecall-ui-jolla/pages/calling/IncomingCallViewBase.qml
+index 6ea6594..47f8504 100644
+--- a/usr/share/voicecall-ui-jolla/pages/calling/IncomingCallViewBase.qml
++++ b/usr/share/voicecall-ui-jolla/pages/calling/IncomingCallViewBase.qml
+@@ -1,5 +1,6 @@
+ import QtQuick 2.0
+ import Sailfish.Silica 1.0
++import org.nemomobile.configuration 1.0
+ import "../../common/CallLog.js" as CallLog
+ 
+ SilicaFlickable {
+@@ -240,7 +241,13 @@ SilicaFlickable {
+                 verticalAlignment: Text.AlignBottom
+                 font.pixelSize: Theme.fontSizeSmall
+                 visible: text.length > 0
+-                text: telephony.simNameForCall(telephony.incomingCall)
++                text: fakeOperator.value ? ("SIM1 | %1".arg(fakeOperator.value)) : telephony.simNameForCall(telephony.incomingCall)
++
++                ConfigurationValue {
++                    id: fakeOperator
++                    key: "/desktop/lipstick-jolla-home/ril_0_fakeName"
++                    defaultValue: ""
++                }
+             }
+         }
+         Image {

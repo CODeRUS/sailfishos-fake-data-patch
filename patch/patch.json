@@ -1,0 +1,8 @@
+{
+    "name": "Fake data for presentation purposes",
+    "description": "Fake data for presentation purposes. Allow changing Operator names, IMEI, Bluetooth and WLAN MAC",
+    "category": "homescreen",
+    "infos": {
+        "maintainer": "coderus"
+    }
+}

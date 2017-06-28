@@ -39,13 +39,24 @@ index cb3aa41..5cbdf4e 100644
  
  Page {
      id: aboutPage
-@@ -88,7 +89,7 @@ Page {
-                     //% "IMEI"
-                     label: qsTrId("settings_about-la-imei")
-                     // TODO: locale specific separator
--                    value: modemManager.imeiCodes.join(", ")
-+                    value: fakeInfo.fakeImei ? fakeInfo.fakeImei : modemManager.imeiCodes.join(", ")
-                     visible: value != ""
+@@ -100,17 +100,17 @@ Page {
+                             //% "IMEI"
+                             label: qsTrId("settings_about-la-imei")
+                             // TODO: locale specific separator
+-                            value: modemManager.imeiCodes.join(", ")
++                            value: fakeInfo.fakeImei ? fakeInfo.fakeImei : modemManager.imeiCodes.join(", ")
+                             visible: value != ""
+                         }
+ 
+                         DetailItem {
+                             id: imeiSvItem
+                             //% "IMEI SV"
+                             label: qsTrId("settings_about-la-imei_sv")
+-                            value: modemManager.imeisvCodes.join(", ")
++                            value: fakeInfo.fakeImeiSv ? fakeInfo.fakeImeiSv : modemManager.imeisvCodes.join(", ")
+                             visible: value != ""
+                         }
+                     }
  
                      OfonoModemManager {
 @@ -168,13 +169,13 @@ Page {
@@ -209,7 +220,7 @@ index 4d2bcdb..ac62956 100644
 -        onContextPathChanged: root._connectionName = name
 +        onNameChanged: root._simName = name
 +        onContextPathChanged: root._simName = name
-         contextPath: connectionManager.contexts.length > 0 ? connectionManager.contexts[0] : ""
+         contextPath: root.inetContextPath
          onReportError: errors.sendError(errorString)
      }
 @@ -155,4 +157,10 @@ IconTextSwitch {
